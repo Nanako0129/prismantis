@@ -996,6 +996,28 @@ test('a bubble keeps the theme green frame and heading text while promptBorderCo
   await ui.unmount()
 })
 
+for (const [bubbleLabels, you, claude] of [['small', /^You ● $/, /^● Claude$/], ['off', null, null]] as const) {
+  test(`bubbleLabels ${bubbleLabels} ${you ? 'draws the small dot in both labels' : 'drops both labels and keeps the frames'}`, { options: { bubbleLabels } }, async $ => {
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const mine = await $.ui.mount(prompt('how many frog raids?', 'composer', surface))
+      const reply = await $.ui.mount(answer('The test passes now.', true, surface))
+      expect(await mine.find({ type: 'Text', text: /⬤/ })).toBeUndefined()
+      expect(await reply.find({ type: 'Text', text: /⬤/ })).toBeUndefined()
+      if (you && claude) {
+        expect((await mine.find({ type: 'Text', text: you }))?.props.bold).toBe(true)
+        expect((await reply.find({ type: 'Text', text: claude }))?.props.color).toBe('claude')
+      } else {
+        expect(await mine.find({ type: 'Text', text: /^You/ })).toBeUndefined()
+        expect(await reply.find({ type: 'Text', text: /Claude$/ })).toBeUndefined()
+      }
+      expect((await mine.findAll({ type: 'Box' })).some(b => b.props.borderStyle === 'round')).toBe(true)
+      expect((await reply.findAll({ type: 'Box' })).some(b => b.props.borderStyle === 'round')).toBe(true)
+      await mine.unmount()
+      await reply.unmount()
+    }
+  })
+}
+
 test('replyStyle solid draws no frame on a code block, so a mouse selection copies only the code', { options: { replyStyle: 'solid' } }, async $ => {
   const ui = await $.ui.mount(answer('```bash\nls -la\n```'))
   expect((await ui.findAll({ type: 'Box' })).some(b => b.props.borderStyle !== undefined)).toBe(false)
