@@ -1013,6 +1013,8 @@ test('replyBorderColor sets the frame and label of Claude\'s bubble, and empty k
     await ui.unmount()
   }
   expect(resolveStyle({ replyBorderColor: '' }).theme.replyBorder).toBeUndefined()
+})
+
 test('alert color options set each alert kind, and an empty one keeps the terminal color', { options: { alertNoteColor: '#a1b5d8', alertCautionColor: '#e3968f', replyStyle: 'off' } }, async $ => {
   for (const surface of ['terminal', 'desktop'] as const) {
     for (const [kind, color] of [['NOTE', '#a1b5d8'], ['CAUTION', '#e3968f'], ['TIP', 'green']] as const) {
@@ -1023,6 +1025,7 @@ test('alert color options set each alert kind, and an empty one keeps the termin
     }
   }
 })
+
 for (const [bubbleLabels, you, claude] of [['small', /^You ● $/, /^● Claude$/], ['off', null, null]] as const) {
   test(`bubbleLabels ${bubbleLabels} ${you ? 'draws the small dot in both labels' : 'drops both labels and keeps the frames'}`, { options: { bubbleLabels } }, async $ => {
     for (const surface of ['terminal', 'desktop'] as const) {
@@ -1044,6 +1047,7 @@ for (const [bubbleLabels, you, claude] of [['small', /^You ● $/, /^● Claude$
     }
   })
 }
+
 test('runningDot blink blinks a running tool\'s dot while the call runs and stops after it', { options: { toolStyle: 'classic', runningDot: 'blink' } }, async ($, on) => {
   engine(on)
   const clock = mock.clock(on)
@@ -1094,6 +1098,8 @@ test('unreadPrompts draws a prompt in the comment grey, blinking to the rule col
   const other = await $.ui.mount(prompt('a prompt nobody sent'))
   expect((await other.find({ type: 'Text', text: /^a prompt nobody sent$/ }))?.props.color).toBe(t.heading)
   await other.unmount()
+})
+
 test('tableTextColor colors plain table cells and leaves the header and inline colors alone', { options: { tableTextColor: '#ffffff', replyStyle: 'off' } }, async $ => {
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount(answer('| Name | Note |\n|--|--|\n| plain | `code` |', true, surface))
