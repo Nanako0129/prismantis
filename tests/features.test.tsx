@@ -1013,6 +1013,15 @@ test('replyBorderColor sets the frame and label of Claude\'s bubble, and empty k
     await ui.unmount()
   }
   expect(resolveStyle({ replyBorderColor: '' }).theme.replyBorder).toBeUndefined()
+test('alert color options set each alert kind, and an empty one keeps the terminal color', { options: { alertNoteColor: '#a1b5d8', alertCautionColor: '#e3968f', replyStyle: 'off' } }, async $ => {
+  for (const surface of ['terminal', 'desktop'] as const) {
+    for (const [kind, color] of [['NOTE', '#a1b5d8'], ['CAUTION', '#e3968f'], ['TIP', 'green']] as const) {
+      const ui = await $.ui.mount(answer(`> [!${kind}]\n> careful`, true, surface))
+      const label = kind[0] + kind.slice(1).toLowerCase()
+      expect((await ui.find({ type: 'Text', text: new RegExp(`^${label}$`) }))?.props.color).toBe(color)
+      await ui.unmount()
+    }
+  }
 })
 
 test('replyStyle solid draws no frame on a code block, so a mouse selection copies only the code', { options: { replyStyle: 'solid' } }, async $ => {
