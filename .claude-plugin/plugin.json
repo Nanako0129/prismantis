@@ -354,6 +354,12 @@
       "description": "Fill behind Claude's replies with replyStyle bubble or solid. Hex, rgb(), ansi256() or a name. Empty uses a midnight blue a step off the theme's background, a pale one in a light theme.",
       "default": ""
     },
+    "pngBackgroundColor": {
+      "type": "string",
+      "title": "png copy background",
+      "description": "Background of the ▣ png copy of tables, diagrams and figures. Hex, rgb(), ansi256() or a name. Empty uses the theme's background, white when the theme has none. Set it to your terminal's background to paste what you see.",
+      "default": ""
+    },
     "alertNoteColor": {
       "type": "string",
       "title": "Note alert",

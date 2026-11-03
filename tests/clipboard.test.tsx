@@ -291,6 +291,7 @@ test('copyButtons off draws no ▣ png', { options: { copyButtons: false } }, as
 })
 
 test('▣ png draws a table as the screen does: header bold in its color, rules, inline colors and table text', { options: { theme: 'catppuccin-mocha', tableTextColor: '#ffffff', tableRuleColor: '#9399b2' } }, async ($, on) => {
+test('pngBackgroundColor sets the background of the png copy', { options: { pngBackgroundColor: '#000000' } }, async ($, on) => {
   clipboardEnv(on, 'macos')
   const inputs: string[] = []
   on('process.run', (_, e) => {
@@ -314,6 +315,9 @@ test('▣ png draws a table as the screen does: header bold in its color, rules,
   expect(at(3, 'b')).toMatchObject({ color: rgb(t.strong!), bold: true })
   expect(at(3, 's')).toMatchObject({ color: rgb(t.emphasis!), italic: true })
   expect(at(3, 'p').bold).toBeUndefined()
+  const ui = await $.ui.mount({ ...mount, props: { text: figures, isFirstOfReply: true } })
+  await ui.press({ key: 'png0' })
+  expect(JSON.parse(inputs[0]!).background).toEqual([0, 0, 0])
   await ui.unmount()
 })
 
