@@ -788,17 +788,76 @@ const tableGrid = (block: Extract<Block, { kind: 'table' }>): string => {
     const left = align === 'right' ? room : align === 'center' ? Math.floor(room / 2) : 0
     return ' '.repeat(left) + text + ' '.repeat(room - left)
   }
-  const line = (l: string, m: string, r: string) => l + widths.map(w => '─'.repeat(w + 2)).join(m) + r
-  const row = (r: string[], header: boolean) => {
+  const line = (l: string, m: string, r: string, fill = '─') => l + widths.map(w => fill.repeat(w + 2)).join(m) + r
+  // header aligned like its column and ╞═╪╡ under it, as the screen draws it
+  const row = (r: string[]) => {
     const lines = r.map((text, c) => wrapRanges(text, widths[c]!).map(([a, b]) => text.slice(a, b)))
     return Array.from({ length: Math.max(...lines.map(l => l.length)) }, (_, i) =>
-      `│ ${lines.map((l, c) => pad(l[i] ?? '', c, header ? 'center' : block.align[c] ?? 'left')).join(' │ ')} │`)
+      `│ ${lines.map((l, c) => pad(l[i] ?? '', c, block.align[c] ?? 'left')).join(' │ ')} │`)
   }
-  const art = [line('┌', '┬', '┐'), ...row(cells[0]!, true), ...cells.slice(1).flatMap(r => [line('├', '┼', '┤'), ...row(r, false)]), line('└', '┴', '┘')]
+  const art = [line('┌', '┬', '┐'), ...row(cells[0]!), ...cells.slice(1).flatMap((r, i) => [i ? line('├', '┼', '┤') : line('╞', '╪', '╡', '═'), ...row(r)]), line('└', '┴', '┘')]
   return art.join('\n')
 }
 
 export const tableArt = (block: Extract<Block, { kind: 'table' }>): string => ['```', tableGrid(block), '```'].join('\n')
+
+// PNG copies keep the on-screen colours
+export type Hues = (string | undefined)[][]
+// plain table text is the terminal's default foreground, which a mod cannot read; this user's is white (sampled from their screenshot 2026-11-03)
+const TABLE_TEXT = '#ffffff'
+// one colour per UTF-16 unit of displayText(nodes), the colour renderInline draws it in
+const inlineHues = (t: Theme, nodes: Inline[], color = TABLE_TEXT): string[] => nodes.flatMap(n => {
+  const own = n.kind === 'strong' ? t.strong : n.kind === 'emphasis' || n.kind === 'math' ? t.emphasis : n.kind === 'code' ? t.inlineCode
+    : n.kind === 'link' || n.kind === 'image' ? t.link : n.kind === 'number' ? t.number : n.kind === 'path' ? t.path : n.kind === 'footnote' ? t.accent : undefined
+  return 'children' in n ? inlineHues(t, n.children, own ?? color) : Array<string>(displayText([n]).length).fill(own ?? color)
+})
+// walks tableGrid's layout again: rules in the rule colour, header in the header colour, body cells in their inline colours
+const tableHues = (style: Style, block: Extract<Block, { kind: 'table' }>, grid: string): Hues => {
+  const t = style.theme
+  const lines = grid.split('\n')
+  const widths = lines[0]!.slice(1, -1).split('┬').map(s => s.length - 2)
+  const body: Hues = []
+  ;[block.header, ...block.rows].forEach((r, i) => {
+    const texts = block.header.map((_, c) => displayText(r[c] ?? []))
+    const paints = block.header.map((_, c) => (i === 0 ? Array<string | undefined>(texts[c]!.length).fill(t.tableHeader) : inlineHues(t, r[c] ?? [])))
+    const pieces = texts.map((text, c) => wrapRanges(text, widths[c]!))
+    for (let k = 0; k < Math.max(...pieces.map(p => p.length)); k++) {
+      const line: (string | undefined)[] = [t.tableRule]
+      pieces.forEach((p, c) => {
+        const [a, b] = p[k] ?? [0, 0]
+        const text = texts[c]!.slice(a, b)
+        const room = Math.max(0, widths[c]! - width(text))
+        const align = block.align[c] ?? 'left'
+        const left = align === 'right' ? room : align === 'center' ? Math.floor(room / 2) : 0
+        line.push(...Array<undefined>(left + 1).fill(undefined))
+        let at = a
+        for (const g of graphemes(text)) {
+          line.push(...cells(g).map(() => paints[c]![at]))
+          at += g.length
+        }
+        line.push(...Array<undefined>(room - left + 1).fill(undefined), t.tableRule)
+      })
+      body.push(line)
+    }
+  })
+  return lines.map(l => (/^[┌├╞└]/.test(l) ? cells(l).map(() => t.tableRule) : body.shift() ?? []))
+}
+// a drawn diagram is a column of rows, each a Text of coloured runs; anything else (a picture) copies in one colour
+const elementHues = (element: RenderElement | undefined, art: string): Hues | undefined => {
+  type Node = { type?: string; props?: { color?: string }; children?: unknown[] }
+  const rows = ((element as Node | undefined)?.children ?? []).map(row => {
+    const out: { g: string; c?: string }[] = []
+    const walk = (n: unknown, color?: string): void => {
+      if (typeof n === 'string') for (const g of cells(n)) out.push({ g, c: color })
+      else if (n && typeof n === 'object') for (const k of (n as Node).children ?? []) walk(k, (n as Node).props?.color ?? color)
+    }
+    walk(row)
+    return out
+  })
+  const lines = art.split('\n')
+  const same = rows.length === lines.length && rows.every((r, i) => r.map(x => x.g).join('').trimEnd() === lines[i]!.trimEnd())
+  return same ? rows.map(r => r.map(x => x.c)) : undefined
+}
 
 const artsOf = (drawn: string | undefined, block: Block): { art?: string | (() => string); grid?: string | (() => string) } =>
   drawn !== undefined ? { art: drawn, grid: drawn } : block.kind === 'table' ? { art: () => tableArt(block), grid: () => tableGrid(block) } : {}
@@ -967,7 +1026,8 @@ const drawHeading = (el: ElementTable, style: Style, block: Extract<Block, { kin
   }
 }
 
-const ALERT_COLOR = { note: 'blue', tip: 'green', important: 'magenta', warning: 'yellow', caution: 'red' } as const
+// Morning Haze hues instead of ANSI names
+const ALERT_COLOR = { note: '#a1b5d8', tip: '#b7d6a6', important: '#c4b7dc', warning: '#ebc98e', caution: '#e3968f' } as const
 
 const prose = (style: Style) => (style.inside === 'quote' ? { italic: true, color: style.theme.quote } : {})
 
@@ -1143,7 +1203,7 @@ const renderList = (el: ElementTable, style: Style, block: Extract<Block, { kind
   )
 }
 
-export type CopyButton = (text: string | (() => string), key: string, label?: string, rich?: (() => string) | 'png') => RenderElement | null
+export type CopyButton = (text: string | (() => string), key: string, label?: string, rich?: (() => string) | 'png', hues?: () => Hues | undefined) => RenderElement | null
 export type Drawn = Map<number, { element?: RenderElement; art?: string; note?: string }>
 export type FoldLook = { label?: string; face?: (folded: boolean) => RenderElement }
 export type Fold = (id: string, hidden: number, key: string, look?: FoldLook) => { folded: boolean; element: RenderElement; faced: boolean; around?: (rows: RenderElement, hover: TextHoverProps) => RenderElement } | null
@@ -1255,7 +1315,8 @@ export const renderBlocks = (el: ElementTable, style: Style, blocks: Block[], co
     const first = text === undefined || isPlainCode ? null : copy?.(text, `copy${b}`, block.kind === 'table' ? '⧉ md' : art === undefined ? undefined : '⧉ source')
     const second = first && art !== undefined ? copy?.(art, `art${b}`, '⧉ art') : null
     const html = first && block.kind === 'table' ? copy?.(() => tableText(block), `html${b}`, '⧉ html', () => tableHtml(block)) : null
-    return { first, second, html, png: second && copy?.(grid!, `png${b}`, '▣ png', 'png') }
+    const hues = () => (typeof grid === 'function' ? (block.kind === 'table' ? tableHues(style, block, grid()) : undefined) : elementHues(drawn.get(b)?.element, grid!))
+    return { first, second, html, png: second && copy?.(grid!, `png${b}`, '▣ png', 'png', hues) }
   })
   const codeHead = (label: string, button: RenderElement | null) => {
     if (!hover || !button) return null
@@ -1320,7 +1381,7 @@ export const renderBlocks = (el: ElementTable, style: Style, blocks: Block[], co
   const copied = rendered.map((element, b) => {
     const block = blocks[b]!
     const { first, second, html, png } = buttons[b]!
-    if (!first) return element
+    if (!first || block.kind === 'list') return element // no copy button on bullet lists
     const { Box } = el
     const hebrew = style.reorder && hasRtl(block.raw)
     const rtl = hebrew && !mirrored(style)
@@ -1391,14 +1452,15 @@ const statusColor = (t: Theme, row: ToolRow) =>
 
 const toolDim = (style: Style) => style.toolStyle !== "classic"
 
-const toolGutter = ({ Box, Text }: ElementTable, style: Style, color: string | undefined, running: boolean) =>
+// a running tool's dot blinks like Claude Code's own (● / blank) instead of a still ◌; `dark` is the blink's off phase
+const toolGutter = ({ Box, Text }: ElementTable, style: Style, color: string | undefined, running: boolean, dark = false) =>
   style.toolStyle.startsWith("tree")
     ? <Box width={4} flexShrink={0}><Text color={color}>{'  ⎿ '}</Text></Box>
-    : <Box width={2} flexShrink={0}><Text color={color}>{running ? '◌' : '●'}</Text></Box>
+    : <Box width={2} flexShrink={0}><Text color={color}>{running && dark ? ' ' : '●'}</Text></Box>
 
-const toolLayout = (el: ElementTable, style: Style, columns: number, label: string, color: string | undefined, running: boolean, text: RenderElement) => {
+const toolLayout = (el: ElementTable, style: Style, columns: number, label: string, color: string | undefined, running: boolean, text: RenderElement, dark = false) => {
   const { Box, Text } = el
-  if (style.toolStyle !== "chat") return <Box flexDirection="row">{toolGutter(el, style, color, running)}{text}</Box>
+  if (style.toolStyle !== "chat") return <Box flexDirection="row">{toolGutter(el, style, color, running, dark)}{text}</Box>
   const w = Math.min(width(label) + 2, Math.max(20, Math.floor(columns * 0.6)))
   return (
     <Box flexDirection="row" justifyContent="flex-end" width="100%">
@@ -2234,13 +2296,14 @@ const quietToolRow = (el: ElementTable, style: Style, row: ToolRow, columns: num
   ))
 }
 
-export const renderToolRow = (el: ElementTable, style: Style, row: ToolRow, columns = 100): RenderElement => {
+export const renderToolRow = (el: ElementTable, style: Style, row: ToolRow, columns = 100, dark = false): RenderElement => {
   if (style.toolOutput === 'quiet') return quietToolRow(el, style, row, columns)
   const { Text } = el
   const t = style.theme
   const isShell = row.tool === 'Bash' || row.tool === 'PowerShell'
   const verb = VERBS[row.tool] ?? row.tool.replace(/^mcp__([^_]+)__/, '$1 ')
-  const found: { target?: string; path?: string } = isShell ? { target: field(row.input, 'command')?.split('\n')[0] } : targetOf(style, row.input, TARGET_FIELDS)
+  // Skill rows name the skill (its input field is `skill`, not in TARGET_FIELDS)
+  const found: { target?: string; path?: string } = isShell ? { target: field(row.input, 'command')?.split('\n')[0] } : targetOf(style, row.input, row.tool === 'Skill' ? ['skill'] : TARGET_FIELDS)
   const target = found.target
   const dot = statusColor(t, row)
   const isPath = target !== undefined && (found.path !== undefined || /^(~|\.{0,2}\/|[A-Za-z]:\\)/.test(target))
@@ -2253,7 +2316,7 @@ export const renderToolRow = (el: ElementTable, style: Style, row: ToolRow, colu
         {target === undefined ? null : isShell ? codeLine(el, style, target, 'bash', 'cmd') : <Text color={isPath ? t.path : t.inlineCode} dimColor={toolDim(style)}>{drawPieces(el, style, [{ text: target, path: toolPath(row.tool, found.path) }])}</Text>}
         {row.isInterrupted ? <Text dimColor> interrupted</Text> : row.isErrored ? <Text color={t.codeFlag}> failed</Text> : null}
       </Text>
-  ))
+  ), dark)
 }
 
 const READ_TOOLS = new Set(['Read', 'Grep', 'Glob', 'LS', 'NotebookRead', 'WebFetch', 'WebSearch', 'Skill'])
@@ -2626,7 +2689,7 @@ const quietToolGroup = (el: ElementTable, style: Style, calls: readonly (ToolRow
   )
 }
 
-export const renderToolGroup = (el: ElementTable, style: Style, calls: readonly (ToolRow & { output?: unknown })[], isActive: boolean, columns = 100): RenderElement => {
+export const renderToolGroup = (el: ElementTable, style: Style, calls: readonly (ToolRow & { output?: unknown })[], isActive: boolean, columns = 100, dark = false): RenderElement => {
   if (style.toolOutput === 'quiet') return quietToolGroup(el, style, calls, isActive, columns)
   const { Text } = el
   const t = style.theme
@@ -2644,7 +2707,7 @@ export const renderToolGroup = (el: ElementTable, style: Style, calls: readonly 
         {failed ? <Text color={t.codeFlag}>{` · ${failed} failed`}</Text> : null}
         {lastTarget ? <Text dimColor>{drawPieces(el, style, [{ text: ' · last: ' }, { text: lastTarget, path: toolPath(last?.tool, lastFound.path) }])}</Text> : null}
       </Text>
-  ))
+  ), dark)
 }
 
 export const formatDuration = (ms: number): string => {
@@ -2681,9 +2744,10 @@ export type DrawPaste = (body: string, key: string) => RenderElement
 
 const CHAT_SHARE = 0.75
 
-const YOU_HEAD = 'You  ⬤ '
+// ● instead of the oversized ⬤
+const YOU_HEAD = 'You ● '
 
-const CLAUDE_HEAD = '⬤  Claude'
+const CLAUDE_HEAD = '● Claude'
 
 const youColor = (theme: Theme): string | undefined => theme.diffAdded ?? theme.accent
 
@@ -2781,7 +2845,8 @@ export const replyRoom = (style: Style): number => ({ off: 0, solid: 0, bubble: 
 
 const solidEdge = (width: number, top: boolean): string => (width < 2 ? (top ? '▄' : '▀').repeat(width) : top ? `▗${'▄'.repeat(width - 2)}▖` : `▝${'▀'.repeat(width - 2)}▘`)
 
-const claudeColor = (theme: Theme): string | undefined => (theme.accent === undefined ? undefined : 'claude')
+// Morning Haze lavender haze instead of Claude Code's orange
+const claudeColor = (theme: Theme): string | undefined => (theme.accent === undefined ? undefined : '#c4b7dc')
 
 const replyFrame = (el: ElementTable, style: Style, body: RenderElement, columns: number): RenderElement => {
   const t = style.theme
@@ -2816,7 +2881,6 @@ export const renderReply = (el: ElementTable, style: Style, drawn: RenderElement
   }
   return (
     <el.Box key="msg" flexDirection="column">
-      {first ? <el.Text color={claudeColor(style.theme)} bold>{CLAUDE_HEAD}</el.Text> : null}
       {replyFrame(el, style, <el.Box flexDirection="row">{body}{room}</el.Box>, columns)}
     </el.Box>
   )

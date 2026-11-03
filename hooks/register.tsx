@@ -10,7 +10,7 @@ import type { ClipboardBackend, HelperCommand } from './clipboard'
 import { clipboardCommand, drawsImages, imageCommand } from './clipboard'
 import { FIGURE_HINT } from './figure'
 import { drawDiagrams } from './mermaid'
-import type { CopyButton, DrawPaste, Fold, TerminalEnv } from './render'
+import type { CopyButton, DrawPaste, Fold, Hues, TerminalEnv } from './render'
 import { MARK, bashEdits, drawMath, drawsHyperlinks, editNotes, fileRoot, hasShellOutput, instanceKey, isReadOnlyCall, leftToEngine, markerRoom, mirrored, noteTip, pasteLang, pathsToProbe, remember, rememberCall, renderBashEdits, renderBlocks, renderDiffCard, renderExpandedShell, renderFailure, renderReply, renderShellResult, renderToolGroup, renderToolRow, renderTurnDuration, renderUserPrompt, replyRoom, replyStyleFor, takesClickableMarks, takesEditorLinks, takesHttpLinks, withoutBashEdits } from './render'
 import type { SetupStep } from './help'
 import { HINT, ISSUE_HINT, NARROW_PANE, narrowHint, SETUP_DONE, SETUP_PANE_KEYS, SETUP_PANE_OPENED, THEME_PREVIEW, findSetup, helpText, languageShowcase, rtlShowcaseText, setupParts, setupSteps, setupText, showcaseText } from './help'
@@ -66,6 +66,22 @@ const setupAt = atom({ plugin: 'prismantis', key: 'setupAt' } as const, 0)
 const setupFocus = atom({ plugin: 'prismantis', key: 'setupFocus' } as const, '')
 const setupLand = atom({ plugin: 'prismantis', key: 'setupLand' } as const, '')
 const foundPaths = atom({ plugin: 'prismantis', key: 'foundPaths' } as const, [])
+const awaiting = atom({ plugin: 'prismantis', key: 'awaiting' } as const, [] as string[])
+const UNREAD_INK = '#8191ad' // Morning Haze comment grey for prompts the model has not read yet
+const UNREAD_DIM = '#394152' // the blink's off phase (Morning Haze rule colour), still visible on black
+const BLINK_MS = 500 // half-second phases, slow enough not to read as flicker
+const blink = atom({ plugin: 'prismantis', key: 'blink' } as const, false)
+let blinking: ReturnType<EngineInterface['clock']['every']> | undefined
+let toolsRunning = 0 // tool calls in flight; their dots blink on the same clock
+const blinkWhileUnread = async ($: EngineInterface) => {
+  const waiting = (await read($, awaiting)).length > 0 || toolsRunning > 0
+  if (waiting && !blinking) blinking = $.clock.every(BLINK_MS, () => void update($, blink, lit => !lit))
+  if (!waiting && blinking) {
+    blinking.cancel()
+    blinking = undefined
+    await update($, blink, () => false)
+  }
+}
 
 const firstDrawn = async ($: EngineInterface, id: string): Promise<number> => {
   const ref = { plugin: 'prismantis', key: 'drawn', id } as const
@@ -323,25 +339,26 @@ const runHelper = async ($: EngineInterface, backend: ClipboardBackend, build: (
   return result.exitCode === 0 ? null : result.stderr.trim() || command.failure
 }
 
-const richCommand = (style: Style, backend: ClipboardBackend, content: string, rich: (() => string) | 'png') => (systemRoot?: string): HelperCommand => rich === 'png'
-  ? imageCommand(backend, content, { foreground: style.theme.diagramText ?? style.theme.codeText, background: style.background }, systemRoot)
+const richCommand = (style: Style, backend: ClipboardBackend, content: string, rich: (() => string) | 'png', hues?: () => Hues | undefined) => (systemRoot?: string): HelperCommand => rich === 'png'
+  ? imageCommand(backend, content, { foreground: style.theme.diagramText ?? style.theme.codeText, background: style.background, hues: hues?.() }, systemRoot) // on-screen colours
   : clipboardCommand(backend, rich(), content, systemRoot)
 
 const offers = (style: Style, rich?: (() => string) | 'png'): boolean => !rich || (rich === 'png' ? drawsImages(style.htmlCopy) : !!style.htmlCopy)
 
 const folder = ($: EngineInterface, el: ReturnType<EngineInterface['ui']['resolve']>, open?: string[], faces = false): Fold => (id, hidden, key, look) => {
   if (!open) return null
-  const folded = !open.includes(id)
+  // everything starts expanded; the list now holds the ids the person folded
+  const folded = open.includes(id)
   const label = folded ? look?.label ?? `+${hidden} more lines` : 'show less'
-  const toggle = () => update($, unfolded, ids => (folded ? [...ids, id].slice(-500) : ids.filter(x => x !== id)))
+  const toggle = () => update($, unfolded, ids => (folded ? ids.filter(x => x !== id) : [...ids, id].slice(-500)))
   if (!faces) return { folded, faced: false, element: <el.Button key={key} variant="secondary" label={label} onPress={toggle} /> }
   const element = look?.face ? <el.Button key={key} plain label={label} onPress={toggle}>{look.face(folded)}</el.Button> : <el.Button key={key} variant="secondary" label={label} onPress={toggle} />
   return { folded, faced: look?.face !== undefined, element, around: (rows, hover) => <el.Button key={`${key}.rows`} plain label={label} hover={hover} onPress={toggle}>{rows}</el.Button> }
 }
 
-const copyOut = async ($: EngineInterface, style: Style, content: string, surface: RenderSurface, rich?: (() => string) | 'png'): Promise<string> => {
+const copyOut = async ($: EngineInterface, style: Style, content: string, surface: RenderSurface, rich?: (() => string) | 'png', hues?: () => Hues | undefined): Promise<string> => {
   const backend = style.htmlCopy
-  const failure = rich && backend ? await runHelper($, backend, richCommand(style, backend, content, rich)) : undefined
+  const failure = rich && backend ? await runHelper($, backend, richCommand(style, backend, content, rich, hues)) : undefined
   if (failure === null) return rich === 'png' ? 'Copied as image' : 'Copied formatted table'
   const result = await $.ui.copy({ text: content, surface })
   if (!result.isCopied) return `Copy failed: ${result.reason}`
@@ -350,8 +367,8 @@ const copyOut = async ($: EngineInterface, style: Style, content: string, surfac
 
 const drawMarkdown = ($: EngineInterface, el: ReturnType<EngineInterface['ui']['resolve']>, style: Style, blocks: ReturnType<typeof parse>, columns: number, math: Map<number, Typeset> = new Map(), pictures: Map<number, Picture> = new Map(), reply?: string, open?: string[], notes?: { id: string; press: boolean }): RenderElement[] => {
   const { Button } = el
-  const copy = (text: string | (() => string), key: string, label = '⧉ copy', rich?: (() => string) | 'png') => {
-    const copied = (surface: RenderSurface) => copyOut($, style, typeof text === 'function' ? text() : text, surface, rich)
+  const copy = (text: string | (() => string), key: string, label = '⧉ copy', rich?: (() => string) | 'png', hues?: () => Hues | undefined) => {
+    const copied = (surface: RenderSurface) => copyOut($, style, typeof text === 'function' ? text() : text, surface, rich, hues)
     return style.copyButtons && offers(style, rich) ? (
       <Button
         key={key}
@@ -648,13 +665,14 @@ export const register: Register = (on, options) => {
         for (const call of e.props.calls) if (call.tool_use_id) rememberCall(expandedCalls, call.tool_use_id, 500)
         return next(e)
       }
-      return renderToolGroup($.ui.resolve(e), forSurface(style, e, await linkReach($, probes, style)), e.props.calls, e.props.isActive, e.viewport?.columns)
+      const dark = e.props.isActive && e.props.calls.some(c => c.isRunning) && (await read($, blink)) // only running rows subscribe to the blink
+      return renderToolGroup($.ui.resolve(e), forSurface(style, e, await linkReach($, probes, style)), e.props.calls, e.props.isActive, e.viewport?.columns, dark)
     })
     on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
       await locate($, style)
       noteCommand(e.props.tool_use_id, e.props.tool, e.props.input)
       if (quiet && isReadOnlyCall(e.props.tool, e.props.input)) rememberCall(readOnlyCalls, e.props.tool_use_id)
-      if (!expandedCalls.has(e.props.tool_use_id)) return renderToolRow($.ui.resolve(e), forSurface(style, e, await linkReach($, probes, style)), e.props, e.viewport?.columns)
+      if (!expandedCalls.has(e.props.tool_use_id)) return renderToolRow($.ui.resolve(e), forSurface(style, e, await linkReach($, probes, style)), e.props, e.viewport?.columns, e.props.isRunning && (await read($, blink))) // blinking dot
       const shell = e.props.tool === 'Bash' || e.props.tool === 'PowerShell'
       return shell && typeof e.props.output !== 'string' ? renderExpandedShell($.ui.resolve(e), style, e.props, e.viewport?.columns) : next(e)
     })
@@ -684,8 +702,11 @@ export const register: Register = (on, options) => {
     })
   }
 
-  on('tool.call', async (_$, e, next) => {
-    const done = await next(e)
+  on('tool.call', async ($, e, next) => {
+    toolsRunning++ // keep the blink clock running while a tool runs
+    await blinkWhileUnread($)
+    const done = await next(e).finally(() => toolsRunning--)
+    await blinkWhileUnread($)
     pathChecks.asked = new Set(pathChecks.found)
     return done
   })
@@ -737,7 +758,41 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // unread prompts draw grey, like Claude Code's own awaitingModel/isQueued.
+  // Claude Code puts every prompt submitted before a main-loop step into that step's request
+  // (mid-turn ones ride along as queued_command), except ctrl+x enter ones, which wait for a
+  // turn of their own. The step's first streamed chunk means the model has them.
+  // Not matched on session.append text: a queued_command row is stored without the text.
+  const ready = new Set<string>() // goes out with the next main-loop request
+  const held = new Set<string>() // waits for its own turn
+  on('turn.start', async ($, e, next) => {
+    const key = promptKey(e.text)
+    if (e.agentId === undefined && held.delete(key)) ready.add(key)
+    return next(e)
+  })
+  on('turn.step', async function* ($, e, next) {
+    const asked = e.agentId === undefined ? [...ready] : undefined
+    let first = asked !== undefined
+    for await (const chunk of next(e)) {
+      if (first) {
+        first = false
+        asked!.forEach(key => ready.delete(key))
+        const list = await read($, awaiting)
+        const left = list.filter(key => ready.has(key) || held.has(key)) // also drops keys left over from before a reload
+        if (left.length !== list.length) await update($, awaiting, () => left)
+        await blinkWhileUnread($)
+      }
+      yield chunk
+    }
+  })
+
   on('prompt.submit', async ($, e, next) => {
+    if (!e.command && (e.origin.kind === 'composer' || e.origin.kind === 'bridge')) {
+      const key = promptKey(e.text)
+      ;(e.wait && e.turnId !== undefined ? held : ready).add(key)
+      await update($, awaiting, list => [...list, key].slice(-20))
+      await blinkWhileUnread($)
+    }
     if (style.clock !== 'off' && (e.origin.kind === 'composer' || e.origin.kind === 'bridge')) {
       const at = await $.clock.now()
       await update($, sent, list => withRecord(list, { text: promptKey(e.text), at }))
@@ -816,7 +871,10 @@ export const register: Register = (on, options) => {
     const time = at === undefined ? undefined : clockText(at, await $.clock.now(), style.clock)
     if (style.promptStyle === 'off') return time === undefined ? next(e) : next({ ...e, props: { ...e.props, text: `[${time}] ${e.props.text}` } })
     const el = $.ui.resolve(e)
-    const drawn = forSurface(style, e, await linkReach($, probes, style))
+    const shown = forSurface(style, e, await linkReach($, probes, style))
+    const unread = (await read($, awaiting)).includes(promptKey(e.props.text))
+    const ink = unread && (await read($, blink)) ? UNREAD_DIM : UNREAD_INK // only unread rows subscribe to the blink
+    const drawn = unread ? { ...shown, theme: { ...shown.theme, heading: ink, accent: ink } } : shown
     const columns = columnsOf(e.viewport)
     const open = await read($, unfolded)
     const paste: DrawPaste = (body, key) => {
