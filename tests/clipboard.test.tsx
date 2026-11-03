@@ -332,6 +332,12 @@ test('pngBackgroundColor sets the background of the png copy', { options: { pngB
   await ui.unmount()
 })
 
+test('the png helper keeps a rule glyph in its drawn color and still makes a bar or a letter readable', () => {
+  const text = '─█a'
+  const glyphs = JSON.parse(imageCommand('macos', text, { foreground: '#000000', background: '#ffffff' }, undefined, [['#f5f5f5', '#f5f5f5', '#f5f5f5']]).stdin).lines[0]
+  expect(glyphs.map((g: { color?: number[] }) => g.color)).toEqual([[245, 245, 245], [0, 0, 0], [0, 0, 0]])
+})
+
 test('▣ png keeps the colors the figure and the diagram draw with', async ($, on) => {
   clipboardEnv(on, 'macos')
   const inputs: string[] = []
