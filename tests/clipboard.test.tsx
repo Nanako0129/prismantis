@@ -289,6 +289,21 @@ test('copyButtons off draws no ▣ png', { options: { copyButtons: false } }, as
   await ui.unmount()
 })
 
+test('pngBackgroundColor sets the background of the png copy', { options: { pngBackgroundColor: '#000000' } }, async ($, on) => {
+  clipboardEnv(on, 'macos')
+  const inputs: string[] = []
+  on('process.run', (_, e) => {
+    inputs.push(e.init?.stdin ?? '')
+    return runResult(0)
+  })
+  recordToasts(on)
+  await startSession($, on)
+  const ui = await $.ui.mount({ ...mount, props: { text: figures, isFirstOfReply: true } })
+  await ui.press({ key: 'png0' })
+  expect(JSON.parse(inputs[0]!).background).toEqual([0, 0, 0])
+  await ui.unmount()
+})
+
 test('▣ png keeps the colors the figure and the diagram draw with', async ($, on) => {
   clipboardEnv(on, 'macos')
   const inputs: string[] = []
