@@ -377,6 +377,8 @@ Options sit under `options`, keyed by the plugin's install name. Project setting
 | `toolStyle` | `chat`, `tree-dim`, `tree-bold`, `classic` | `chat` |
 | `toolOutput` | `full`, `quiet` | `full` |
 | `folds` | `closed` (long blocks start folded to their first lines), `open` (they start whole, with `show less`) | `closed` |
+| `runningDot` | `ring` (a still `◌`), `blink` (`●` on and off every half second) | `ring` |
+| `unreadPrompts` | `true` (a prompt stays grey and blinks until the model starts on it), `false` | `false` |
 | `copyButtons` | `true`, `false` | `true` |
 | `copyButtonStyle` | `inline`, `hover` | `inline` |
 | `textCopyButtons` | `true`, `false` | `true` |
