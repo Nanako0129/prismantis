@@ -1094,6 +1094,14 @@ test('unreadPrompts draws a prompt in the comment grey, blinking to the rule col
   const other = await $.ui.mount(prompt('a prompt nobody sent'))
   expect((await other.find({ type: 'Text', text: /^a prompt nobody sent$/ }))?.props.color).toBe(t.heading)
   await other.unmount()
+test('tableTextColor colors plain table cells and leaves the header and inline colors alone', { options: { tableTextColor: '#ffffff', replyStyle: 'off' } }, async $ => {
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount(answer('| Name | Note |\n|--|--|\n| plain | `code` |', true, surface))
+    expect((await ui.find({ type: 'Text', text: /^plain$/ }))?.props.color).toBe('#ffffff')
+    expect((await ui.findAll({ type: 'Text', text: /^code$/ })).at(-1)?.props.color).toBe(t.inlineCode)
+    expect((await ui.find({ type: 'Text', text: /^Name$/ }))?.props.color).toBe(t.tableHeader)
+    await ui.unmount()
+  }
 })
 
 test('replyStyle solid draws no frame on a code block, so a mouse selection copies only the code', { options: { replyStyle: 'solid' } }, async $ => {
