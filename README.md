@@ -72,7 +72,7 @@ prismantis also runs in OpenCode 2.2.5 and later, where it draws figure blocks i
 
 | Feature | What you get |
 | --- | --- |
-| [Themes](#themes) | `/prismantis theme <name>` switches on the spot. 17 themes and 26 color slots you can override |
+| [Themes](#themes) | `/prismantis theme <name>` switches on the spot. 17 themes and 27 color slots you can override |
 | [Tables](#tables) | colored headers, rules, column alignment, colored numbers, sized to the terminal |
 | [Code](#code) | a language header and copy button, Prism highlighting in two dozen languages, shell lines colored like a prompt |
 | [Diagrams and charts](#diagrams-and-charts) | flowcharts, sequence, state, class and ER diagrams, bar and line charts, one color per box, participant and bar |
@@ -312,7 +312,7 @@ Task lists draw as `[ ]` and `[✓]`, with done items dimmed and struck through.
 
 ![Your prompts: plain Claude Code on the left, prismantis on the right](docs/compare/prompts.png)
 
-What you type, at the prompt or through Remote Control, draws in the theme's colors. `promptStyle` picks the look, and `off` keeps Claude Code's own. `bubble` draws it on the right like a chat app, as wide as its longest line and at most three quarters of the window, under `You ⬤`, in a rounded frame of the theme's green on a deep green fill, a pale one in a light theme, and Claude's replies in a bubble of their own. The other styles keep Claude's replies as they were. `promptFillColor` and `replyFillColor` change the two fills. Task notifications and teammate messages are left alone.
+What you type, at the prompt or through Remote Control, draws in the theme's colors. `promptStyle` picks the look, and `off` keeps Claude Code's own. `bubble` draws it on the right like a chat app, as wide as its longest line and at most three quarters of the window, under `You ⬤`, in a rounded frame of the theme's green on a deep green fill, a pale one in a light theme, and Claude's replies in a bubble of their own. The other styles keep Claude's replies as they were. `promptFillColor` and `replyFillColor` change the two fills, and `replyBorderColor` the frame of Claude's. Task notifications and teammate messages are left alone.
 
 | `bubble` (default) | `wide` | `bar` | `chevron` |
 |---|---|---|---|
@@ -417,6 +417,7 @@ A color is hex (`#a6e3a1`, `#fc0`), `rgb(166,227,161)`, `ansi256(114)` or a name
 | `promptBorder` | the frame and `You ⬤` label of your prompts with `promptStyle: bubble`, and the hue of their default fill (the `diffAdded` green) |
 | `promptText` | the text of your prompts with `promptStyle: bubble` (the `heading` color, or `codeText` where that would not read on the fill) |
 | `replyFill` | the fill behind Claude's replies with `replyStyle: bubble` or `solid` (a midnight blue a step off the background, a pale one in a light theme) |
+| `replyBorder` | the frame and `⬤ Claude` label of Claude's replies with `replyStyle: bubble` or `framed` (Claude Code's own Claude orange) |
 
 ## Troubleshooting
 
