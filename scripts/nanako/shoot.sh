@@ -13,7 +13,8 @@ cwd=${SHOT_CWD:-$HOME}
 export CLAUDE_CONFIG_DIR="$C"
 claude plugin marketplace remove drive >/dev/null 2>&1 || true
 rm -rf "$M" && mkdir -p "$M/.claude-plugin"
-rsync -a --exclude .git --exclude node_modules "$repo/" "$M/prismantis/"
+src="$repo"; [ -f "$repo/plugin/.claude-plugin/plugin.json" ] && src="$repo/plugin"
+rsync -a --exclude .git --exclude node_modules "$src/" "$M/prismantis/"
 echo '{"name":"drive","owner":{"name":"drive"},"plugins":[{"name":"prismantis","source":"./prismantis"}]}' >| "$M/.claude-plugin/marketplace.json"
 claude plugin marketplace add "$M" >/dev/null
 claude plugin install prismantis@drive >/dev/null
