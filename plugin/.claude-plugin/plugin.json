@@ -429,6 +429,13 @@
       "default": "closed",
       "options": ["closed", "open"]
     },
+    "codeBlocks": {
+      "type": "string",
+      "title": "Code blocks",
+      "description": "Who draws code blocks in replies in the terminal. prismantis: highlighted in the theme's colors. claude: Claude Code's own code element, in its colors, with far fewer elements to lay out, so scrolling past code costs less. The desktop app and VS Code always use Claude Code's.",
+      "default": "prismantis",
+      "options": ["prismantis", "claude"]
+    },
     "copyButtons": {
       "type": "boolean",
       "title": "Copy buttons",
