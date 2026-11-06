@@ -18,6 +18,8 @@ rsync -a --exclude .git --exclude node_modules "$src/" "$M/prismantis/"
 echo '{"name":"drive","owner":{"name":"drive"},"plugins":[{"name":"prismantis","source":"./prismantis"}]}' >| "$M/.claude-plugin/marketplace.json"
 claude plugin marketplace add "$M" >/dev/null
 claude plugin install prismantis@drive >/dev/null
+want=$(jq -r .version "$src/.claude-plugin/plugin.json")
+[ -d "$C/plugins/cache/drive/prismantis/$want/hooks" ] || { echo "prismantis $want did not install into $C/plugins/cache/drive" >&2; exit 4; }
 others=$(cd "$C/plugins/cache" && for m in *; do [ "$m" = drive ] && continue; for p in "$m"/*; do [ -d "$p" ] && printf '%s@%s\n' "${p#*/}" "$m"; done; done | jq -R . | jq -s 'map({(.): false}) | add // {}')
 jq --argjson o "$opts" --argjson off "$others" '.pluginConfigs["prismantis@drive"].options = $o | .enabledPlugins = ($off + {"prismantis@drive": true}) | .statusLine = {"type": "command", "command": "printf \" \""} | .spinnerTipsEnabled = false' "$C/settings.json" >| "$C/settings.tmp" && mv "$C/settings.tmp" "$C/settings.json"
 perl -e 'alarm shift; exec @ARGV' 240 python3 "$here/capture_snap.py" "$root/$name.bin" "$cwd" "$cols" "$rows" "$steps" env -u CLAUDE_CODE_PLUGIN_DIRS -u CLAUDE_CODE_CHILD_SESSION claude "${@:7}" >/dev/null 2>&1 || echo "capture exited $?" >&2
