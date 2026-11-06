@@ -44,6 +44,7 @@ export type Style = {
   mermaidAscii: boolean
   copyButtons: boolean
   folds: 'closed' | 'open'
+  codeBlocks: 'prismantis' | 'claude'
   copyButtonStyle: 'dim' | 'inline' | 'hover'
   textCopyButtons: boolean
   htmlCopy: ClipboardBackend | null
@@ -122,6 +123,7 @@ export const resolveStyle = (options: PluginOptions): Style => {
     mermaidAscii: options.mermaidAscii === true,
     copyButtons: options.copyButtons !== false,
     folds: pick(options.folds, ['closed', 'open'] as const, 'closed'),
+    codeBlocks: pick(options.codeBlocks, ['prismantis', 'claude'] as const, 'prismantis'),
     copyButtonStyle: pick(options.copyButtonStyle, ['dim', 'inline', 'hover'] as const, 'dim'),
     textCopyButtons: options.textCopyButtons !== false,
     htmlCopy: null,

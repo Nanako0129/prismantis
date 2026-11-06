@@ -119,6 +119,12 @@ Each code block gets a header row: the language on the left, a copy button on th
 - **Prism** highlights JavaScript, TypeScript, JSX/TSX, Python, Go, Rust, Java, Kotlin, Swift, C, C++, C#, Ruby, JSON, YAML, TOML, SQL, HTML, CSS, Dockerfile, HCL, Lua, PHP and diff.
 - **Shell** blocks (`bash`, `sh`, `zsh`, `fish`, `powershell`, unlabeled) color the command word, `--flags`, quoted strings and `# comments`, and restart after `|`, `&&` and `;`.
 
+`codeBlocks` picks who draws them in the terminal. `prismantis` (the default) highlights them in the theme's colors as above. `claude` hands them to Claude Code's own code element, which draws them in Claude Code's colors and lays out far fewer elements, so scrolling past long code costs less. The header, copy button and folding stay. The desktop app and VS Code always use Claude Code's element.
+
+| `prismantis` (default) | `claude` |
+| --- | --- |
+| ![a TypeScript line highlighted in the theme's colors](docs/codeblocks/prismantis.png) | ![the same line drawn by Claude Code's code element](docs/codeblocks/claude.png) |
+
 ### Diagrams and charts
 
 ![Diagrams and charts: plain Claude Code on the left, prismantis on the right](docs/compare/diagrams.png)
@@ -383,6 +389,7 @@ Options sit under `options`, keyed by the plugin's install name. Project setting
 | `highlightNumbers` | `true`, `false` | `true` |
 | `highlightPaths` | `true`, `false` | `true` |
 | `folds` | `closed` (long blocks start folded to their first lines), `open` (they start whole, with `show less`) | `closed` |
+| `codeBlocks` | `prismantis` (highlighted in the theme's colors), `claude` (Claude Code's own code element, lighter to scroll) | `prismantis` |
 | `toolRows` | `true`, `false` | `true` |
 | `toolStyle` | `chat`, `tree-dim`, `tree-bold`, `classic` | `chat` |
 | `toolOutput` | `full`, `quiet` | `full` |

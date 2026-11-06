@@ -593,6 +593,8 @@ export const highlightBlock = ({ Text }: ElementTable, style: Style, lines: stri
   ))
 }
 
+const engineCode = (style: Style): boolean => style.nativeCode === true || style.codeBlocks === 'claude'
+
 const gutterOf = (lines: string[], numbered: boolean) => (numbered ? String(lines.length).length + 2 : 0)
 
 const heldSegments = (style: Style, lines: string[], lang: string): Segment[][] =>
@@ -609,7 +611,7 @@ const heldCode = (el: ElementTable, style: Style, lines: string[], shown: number
 const figureFallbackLines = (block: Extract<Block, { kind: 'code' }>): string[] => isFigureLang(block.lang) ? block.lines.map(figureText) : block.lines
 
 const codeRows = (el: ElementTable, style: Style, lines: string[], shown: number, lang: string, numbered: boolean, room: number, key: string): RenderElement[] => {
-  if (style.nativeCode) return [<el.Code key="code" source={lines.slice(0, shown).join('\n') || ' '} {...(lang ? { language: lang } : {})} {...(numbered ? { startLine: 1 } : {})} />]
+  if (engineCode(style)) return [<el.Code key="code" source={lines.slice(0, shown).join('\n') || ' '} {...(lang ? { language: lang } : {})} {...(numbered ? { startLine: 1 } : {})} />]
   const rows = (isShellLang(lang) ? null : highlightBlock(el, style, lines, lang, key, room))?.slice(0, shown) ?? lines.slice(0, shown).map((line, i) => codeLine(el, style, line, lang, `${key}.${i}`, room))
   return style.shape === 'engine' ? rows.map((row, i) => <el.Text key={`${key}.ltr${i}`} {...heldLtr(style)}>{row}</el.Text>) : rows
 }
@@ -618,7 +620,7 @@ const codeBody = (el: ElementTable, style: Style, rows: RenderElement[], gutter:
   const { Box, Text } = el
   return (
     <Box flexDirection="column" paddingLeft={held ? 0 : 2}>
-      {held || !gutter || style.nativeCode ? rows : rows.map((row, i) => row.type === 'Text' ? <Box key={`n${i}`} flexDirection="row"><Text color={style.theme.codeComment} dimColor>{`${String(i + 1).padStart(gutter)}  `}</Text>{row}</Box> : row)}
+      {held || !gutter || engineCode(style) ? rows : rows.map((row, i) => row.type === 'Text' ? <Box key={`n${i}`} flexDirection="row"><Text color={style.theme.codeComment} dimColor>{`${String(i + 1).padStart(gutter)}  `}</Text>{row}</Box> : row)}
       {held && more ? <Box paddingLeft={2}>{more}</Box> : more}
     </Box>
   )
@@ -1327,7 +1329,7 @@ export const renderBlocks = (el: ElementTable, style: Style, blocks: Block[], co
         const numbered = lines.length >= NUMBER_AT && lines.length <= NUMBER_MAX
         const room = columns - 2 - gutterOf(lines, numbered)
         const gutter = numbered ? String(lines.length).length : 0
-        const held = !style.nativeCode && mirrored(style) && lines.some(line => hasRtl(line) && (!opensLatin(line) || width(line) > room))
+        const held = !engineCode(style) && mirrored(style) && lines.some(line => hasRtl(line) && (!opensLatin(line) || width(line) > room))
         const rows = held ? heldCode(el, style, lines, shown, block.lang, gutter, room, key) : codeRows(el, style, lines, shown, block.lang, numbered, room, key)
         const button = copy?.(lines.join('\n'), `copy${b}`) ?? null
         const label = codeLabel(block)

@@ -525,6 +525,29 @@ test('code blocks draw through the native Code element off the terminal', async 
   await term.unmount()
 })
 
+test('codeBlocks claude hands terminal code blocks to the native Code element', { options: { codeBlocks: 'claude' } }, async $ => {
+  const ui = await $.ui.mount({ ...draw('```ts\nconst name = "shop"\n  return name\n```'), surface: 'terminal' })
+  const code = await ui.find({ type: 'Code' })
+  expect(code?.props.source).toBe('const name = "shop"\n  return name')
+  expect(code?.props.language).toBe('ts')
+  expect(await ui.find({ type: 'Text', text: /^const$/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /^── ts$/ })).toBeTruthy()
+  await ui.unmount()
+  const long = await $.ui.mount({ ...draw(longCode(40)), surface: 'terminal' })
+  const folded = await long.find({ type: 'Code' })
+  expect(folded?.props.startLine).toBe(1)
+  expect(String(folded?.props.source).split('\n')).toHaveLength(20)
+  expect((await long.find({ key: 'fold0' }))?.props.label).toBe('+20 more lines')
+  await long.unmount()
+})
+
+test('codeBlocks falls back to prismantis drawing on an unknown value', { options: { codeBlocks: 'native' } }, async $ => {
+  const ui = await $.ui.mount({ ...draw('```ts\nconst name = "shop"\n```'), surface: 'terminal' })
+  expect(await ui.find({ type: 'Code' })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /^const$/ })).toBeTruthy()
+  await ui.unmount()
+})
+
 test('tables draw boxed by default in the terminal, with a double line under the header', async $ => {
   const ui = await $.ui.mount({ ...draw(TABLE), surface: 'terminal' })
   const top = (await ui.find({ type: 'Text', text: /^┌[─┬]+┐$/ }))?.text ?? ''
