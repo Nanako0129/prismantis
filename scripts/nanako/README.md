@@ -14,7 +14,7 @@ plugin but the one under test off and blanks the status line on each run.
 
 - `shoot.sh <checkout> <name> <cols> <rows> '<options json>' '<steps json>' [claude args]`:
   one scene. Steps are `[seconds, keys]`; `SNAPS="3 4"` also renders the screen after those steps.
-  Output goes to `$SHOTS_DIR` (default `~/.cache/prismantis-shots`), run in `$SHOT_CWD`.
+  Output goes to `$SHOTS_DIR` (default `~/.cache/prismantis-shots`), run in `$SHOT_CWD` (default `$SHOTS_DIR/cwd`, created and marked trusted; never `$HOME`, whose `~/.claude/settings.json` would load as project settings).
 - `batch.py [name ...]`: the scenes used for the 2026-11 PRs. It expects each branch exported to
   `$SHOTS_DIR/src/<branch>` (`git archive <branch> | tar -x -C …`) and crops each png with
   `crop.swift` (header and prompt cut off, trailing blank rows trimmed).

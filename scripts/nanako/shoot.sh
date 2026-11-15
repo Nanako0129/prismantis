@@ -1,13 +1,14 @@
 #!/bin/bash
 # usage: shoot.sh <checkout> <name> <cols> <rows> '<options json>' '<steps json>'
 # Installs the checkout into the persistent screenshot config (~/.claude-shots, logged in once by hand)
-# with those prismantis options, drives a hidden Claude Code session through the steps (cwd $SHOT_CWD, default ~),
+# with those prismantis options, drives a hidden Claude Code session through the steps (cwd $SHOT_CWD, default $SHOTS_DIR/cwd, created and trusted),
 # and renders what it drew to <name>.png with xterm.js in headless Chrome.
 set -euo pipefail
 repo=$(cd "$1" && pwd -P); name=$2; cols=$3; rows=$4; opts=$5; steps=$6
 root=${SHOTS_DIR:-$HOME/.cache/prismantis-shots}; mkdir -p "$root"; here=$(cd "$(dirname "$0")" && pwd)
 C=$HOME/.claude-shots; M="$root/mkt"; X="$root/node_modules/@xterm/xterm"; HERE="$repo/.claude/skills/live-check"
-cwd=${SHOT_CWD:-$HOME}
+cwd=${SHOT_CWD:-$root/cwd}; mkdir -p "$cwd"; cwd=$(cd "$cwd" && pwd -P)
+jq --arg d "$cwd" '.projects[$d].hasTrustDialogAccepted = true' "$C/.claude.json" >| "$C/.claude.tmp" && mv "$C/.claude.tmp" "$C/.claude.json"
 [ -x "$root/crop" ] || swiftc -O "$here/crop.swift" -o "$root/crop"
 [ -d "$X" ] || npm i -s --prefix "$root" @xterm/xterm >/dev/null
 export CLAUDE_CONFIG_DIR="$C"
