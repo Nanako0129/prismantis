@@ -18,4 +18,5 @@ plugin but the one under test off and blanks the status line on each run.
 - `batch.py [name ...]`: the scenes used for the 2026-11 PRs. It expects each branch exported to
   `$SHOTS_DIR/src/<branch>` (`git archive <branch> | tar -x -C …`) and crops each png with
   `crop.swift` (header and prompt cut off, trailing blank rows trimmed).
+- `$SHOTS_DIR/cut <in.png> <out.png> <top> <bottom>` (built by shoot.sh from `cut.swift`) keeps one band of pixel rows, for one section of a long demo render. Keep helpers here, not in a session scratchpad: that gets cleared between sessions.
 - Before publishing, read every image for paths, account names and usage figures.

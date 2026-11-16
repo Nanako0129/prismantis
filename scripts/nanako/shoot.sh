@@ -10,6 +10,7 @@ C=$HOME/.claude-shots; M="$root/mkt"; X="$root/node_modules/@xterm/xterm"; HERE=
 cwd=${SHOT_CWD:-$root/cwd}; mkdir -p "$cwd"; cwd=$(cd "$cwd" && pwd -P)
 jq --arg d "$cwd" '.projects[$d].hasTrustDialogAccepted = true' "$C/.claude.json" >| "$C/.claude.tmp" && mv "$C/.claude.tmp" "$C/.claude.json"
 [ -x "$root/crop" ] || swiftc -O "$here/crop.swift" -o "$root/crop"
+[ -x "$root/cut" ] || swiftc -O "$here/cut.swift" -o "$root/cut"
 [ -d "$X" ] || npm i -s --prefix "$root" @xterm/xterm >/dev/null
 export CLAUDE_CONFIG_DIR="$C"
 claude plugin marketplace remove drive >/dev/null 2>&1 || true

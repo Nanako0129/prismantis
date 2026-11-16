@@ -7,6 +7,8 @@ cmd = sys.argv[6:]
 pid, fd = pty.fork()
 if pid == 0:
     os.chdir(cwd)
+    for k in [k for k in os.environ if k.startswith(('TERM_PROGRAM', 'KITTY_', 'GHOSTTY_', 'WEZTERM_', 'ALACRITTY_', 'ITERM_', 'LC_TERMINAL', 'WT_', 'VSCODE_', 'ORCA_', 'TMUX', 'CLAUDE_CODE_FORCE_TERMINAL_IMAGES', 'FORCE_HYPERLINK'))]:
+        del os.environ[k]
     os.environ.update(TERM='xterm-256color', COLORTERM='truecolor', COLUMNS=str(cols), LINES=str(rows))
     os.execvp(cmd[0], cmd)
 
